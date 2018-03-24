@@ -1,0 +1,159 @@
+
+---
+title: "Activity Monitoring"
+author: "Aravind"
+date: "March 23, 2018"
+output: html_document
+---
+Reproducible Research Project 1
+=================================
+
+## Introduction
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+The data for this assignment can be downloaded from the course web site:
+
+* Dataset: [Activity monitoring data [52K]](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
+The variables included in this dataset are:
+
+* steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+* date: The date on which the measurement was taken in YYYY-MM-DD format
+* interval: Identifier for the 5-minute interval in which measurement was taken
+
+## 1. Loading and pre-processing the dataset
+
+```{r }
+## Download the file unzipping in the directory
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", "act_mon.zip")
+zipF<-file.choose() # lets you choose a file and save its file path in R (at least for windows)
+outDir<-"assignment1" # Define the folder where the zip file should be unzipped to 
+unzip(zipF,exdir=outDir)
+
+## Reading and pre-processing the activity monitoring dataset
+activity <- read.csv(".//assignment1//activity.csv")
+head(activity)
+
+activity$date <- as.Date(as.character(activity$date), "%Y-%m-%d")
+activity$interval <- as.factor(activity$interval)
+str(activity)
+```
+
+## 2. Total number of steps taken per day
+
+```{r}
+## Calculating total number of steps taken per day
+aggr_data <- aggregate(activity$steps, by = list(activity$date), sum, na.rm = TRUE)
+names(aggr_data) <- c("Date", "sum")
+
+##  Histogram plot of total no of steps taken per day
+hist(aggr_data$sum, ylim = c(0,35),
+     xlab = "No of steps", 
+     ylab = "Frequency", 
+     main = "Total no of steps per Day")
+```
+
+## 3. Mean and Median of total no of steps taken per day
+
+```{r computing mean and median}
+mean_data <- mean(aggr_data$sum, na.rm = T)
+median_data <-  median(aggr_data$sum)
+```
+The mean and median values for the total number of steps per each day are `r mean_data` and `r median_data`
+
+## 4. Time series plot of the average number of steps
+
+``` {r}
+mean_interval <- aggregate(activity$steps, by = list(activity$interval), mean, na.rm = TRUE)
+names(mean_interval) <- c("Interval", "average")
+## Time series plot 
+library(ggplot2)
+ggplot(mean_interval, aes(Interval, average, group =1)) + 
+  geom_line() +
+  geom_path() + 
+  ggtitle("Average Daily Activity Pattern") +
+  labs(x="Interval", y = "Mean number of steps")
+```
+
+## 5. The  5-minute interval that, on average, contains the maximum number of steps
+
+```{r Maximum Interval Mean}
+I_max <- mean_interval[which.max(mean_interval$average),"Interval"]
+```
+The interval with maximum number of steps, on average across all days is `r I_max`
+
+## 6. Strategy for imputing missing data
+
+```{r}
+summary(activity)
+```
+```{r echo=FALSE}
+x = sum(is.na(activity$steps))
+```
+The dataset contains a total of `r x` NA values
+
+```{r}
+## Finding the positions of NA'sin activity dataset
+na_pos <- which(is.na(activity$steps))
+
+## Creating a vector to fill the missing values by using strategy of imputing the mean number of steps across each interval 
+new_vector <- rep(mean(mean_interval$average, na.rm = TRUE), length(na_pos))
+
+## Filling in the position of missing values with new values
+activity[na_pos, "steps"] <- new_vector
+head(activity)
+```
+
+## 7. Histogram of the total number of steps taken each day after missing values are imputed
+
+```{r}
+## Calculating total number of steps taken per day for updated dataset
+aggr_data1 <- aggregate(activity$steps, by = list(activity$date), sum)
+names(aggr_data1) <- c("Date", "sum")
+
+##  Histogram plot of total no of steps taken per day
+hist(aggr_data1$sum, ylim = c(0,35),
+     xlab = "No of steps", 
+     ylab = "Frequency", 
+     main = "Total no of steps per Day")
+```
+
+```{r}
+## Computing mean and median for the new dataset
+mean_data1 <- mean(aggr_data1$sum)
+median_data1 <- median(aggr_data1$sum)
+```
+The new mean and median values for the total number of steps per each day are `r mean_data1` and `r median_data1`
+
+Therefore, after filling the missing values, the values of mean and median increased and is equal to `r mean_data1`
+
+## 8. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+```{r}
+Day_Type <- function(date) {
+  day <- weekdays(date)
+    if ( day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+           return ("weekday")
+  else if (day %in% c("Saturday", "Sunday"))
+           return ("weekend")}
+
+## Adding a new column to the dataset
+activity$day_type <- sapply(activity$date, Day_Type)
+head(activity)
+
+## Finding the mean of the total no of steps by day_type and interval
+mean_interval1 <- aggregate(activity$steps, by = list(activity$day_type, activity$interval), mean)
+names(mean_interval1) <- c("day_type", "interval", "average")
+head(mean_interval1)
+
+## Time series plot 
+library(ggplot2)
+ggplot(mean_interval1, aes(interval, average, group =1)) + 
+  facet_grid(day_type~.) +
+  geom_line() +
+  geom_path() + 
+  ggtitle("Average Daily Activity Pattern") +
+  labs(x="Interval", y = "Mean number of steps")
+```
+
